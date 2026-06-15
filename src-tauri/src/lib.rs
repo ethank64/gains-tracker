@@ -10,48 +10,61 @@ fn greet(name: &str) -> String {
 pub fn run() {
     // Schema for the local SQLite database. Migrations run automatically when
     // the frontend calls Database.load("sqlite:gains.db").
-    let migrations = vec![Migration {
-        version: 1,
-        description: "create macro and workout tables",
-        sql: "
-            CREATE TABLE IF NOT EXISTS targets (
-                id          INTEGER PRIMARY KEY,
-                bodyweight  REAL,
-                goal_weight REAL,
-                calories    REAL,
-                protein     REAL,
-                carbs       REAL,
-                fat         REAL
-            );
-            CREATE TABLE IF NOT EXISTS foods (
-                id       INTEGER PRIMARY KEY AUTOINCREMENT,
-                name     TEXT NOT NULL,
-                calories REAL,
-                protein  REAL,
-                carbs    REAL,
-                fat      REAL
-            );
-            CREATE TABLE IF NOT EXISTS food_log (
-                id       INTEGER PRIMARY KEY AUTOINCREMENT,
-                date     TEXT NOT NULL,
-                name     TEXT,
-                qty      REAL,
-                calories REAL,
-                protein  REAL,
-                carbs    REAL,
-                fat      REAL
-            );
-            CREATE TABLE IF NOT EXISTS workout_log (
-                id       INTEGER PRIMARY KEY AUTOINCREMENT,
-                date     TEXT NOT NULL,
-                exercise TEXT,
-                sets     INTEGER,
-                reps     INTEGER,
-                weight   REAL
-            );
-        ",
-        kind: MigrationKind::Up,
-    }];
+    let migrations = vec![
+        Migration {
+            version: 1,
+            description: "create macro and workout tables",
+            sql: "
+                CREATE TABLE IF NOT EXISTS targets (
+                    id          INTEGER PRIMARY KEY,
+                    bodyweight  REAL,
+                    goal_weight REAL,
+                    calories    REAL,
+                    protein     REAL,
+                    carbs       REAL,
+                    fat         REAL
+                );
+                CREATE TABLE IF NOT EXISTS foods (
+                    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name     TEXT NOT NULL,
+                    calories REAL,
+                    protein  REAL,
+                    carbs    REAL,
+                    fat      REAL
+                );
+                CREATE TABLE IF NOT EXISTS food_log (
+                    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date     TEXT NOT NULL,
+                    name     TEXT,
+                    qty      REAL,
+                    calories REAL,
+                    protein  REAL,
+                    carbs    REAL,
+                    fat      REAL
+                );
+                CREATE TABLE IF NOT EXISTS workout_log (
+                    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date     TEXT NOT NULL,
+                    exercise TEXT,
+                    sets     INTEGER,
+                    reps     INTEGER,
+                    weight   REAL
+                );
+            ",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "create bodyweight log (one weigh-in per day)",
+            sql: "
+                CREATE TABLE IF NOT EXISTS bodyweight_log (
+                    date   TEXT PRIMARY KEY,
+                    weight REAL NOT NULL
+                );
+            ",
+            kind: MigrationKind::Up,
+        },
+    ];
 
     tauri::Builder::default()
         .plugin(

@@ -38,12 +38,26 @@ const sqliteBackend = {
 		const foods = await db.select('SELECT * FROM foods ORDER BY id');
 		const fl = await db.select('SELECT * FROM food_log ORDER BY id');
 		const wl = await db.select('SELECT * FROM workout_log ORDER BY id');
+		const bw = await db.select('SELECT date, weight FROM bodyweight_log ORDER BY date');
 		return {
 			targets: t.length ? rowToTargets(t[0]) : null,
 			foods,
 			foodLog: groupByDate(fl),
-			workoutLog: groupByDate(wl)
+			workoutLog: groupByDate(wl),
+			bodyweightLog: bw
 		};
+	},
+	async logBodyweight(date, weight) {
+		const db = await sdb();
+		await db.execute(
+			`INSERT INTO bodyweight_log (date, weight) VALUES ($1, $2)
+			 ON CONFLICT(date) DO UPDATE SET weight = $2`,
+			[date, weight]
+		);
+	},
+	async removeBodyweight(date) {
+		const db = await sdb();
+		await db.execute('DELETE FROM bodyweight_log WHERE date = $1', [date]);
 	},
 	async saveTargets(t) {
 		const db = await sdb();
@@ -101,14 +115,33 @@ function blob() {
 	} catch {
 		/* fall through to fresh blob */
 	}
-	return { targets: null, foods: [], foodLog: {}, workoutLog: {}, seq: 1 };
+	return { targets: null, foods: [], foodLog: {}, workoutLog: {}, bodyweight: {}, seq: 1 };
 }
 const persist = (b) => localStorage.setItem(LS_KEY, JSON.stringify(b));
 
 const localBackend = {
 	async loadAll() {
 		const b = blob();
-		return { targets: b.targets, foods: b.foods, foodLog: b.foodLog, workoutLog: b.workoutLog };
+		const bodyweightLog = Object.entries(b.bodyweight ?? {})
+			.map(([date, weight]) => ({ date, weight }))
+			.sort((a, z) => a.date.localeCompare(z.date));
+		return {
+			targets: b.targets,
+			foods: b.foods,
+			foodLog: b.foodLog,
+			workoutLog: b.workoutLog,
+			bodyweightLog
+		};
+	},
+	async logBodyweight(date, weight) {
+		const b = blob();
+		(b.bodyweight ??= {})[date] = weight;
+		persist(b);
+	},
+	async removeBodyweight(date) {
+		const b = blob();
+		if (b.bodyweight) delete b.bodyweight[date];
+		persist(b);
 	},
 	async saveTargets(t) {
 		const b = blob();
@@ -157,5 +190,7 @@ export const {
 	addFoodEntry,
 	removeFoodEntry,
 	addWorkoutEntry,
-	removeWorkoutEntry
+	removeWorkoutEntry,
+	logBodyweight,
+	removeBodyweight
 } = backend;

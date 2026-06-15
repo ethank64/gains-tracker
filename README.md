@@ -27,6 +27,8 @@ pnpm tauri build
   your own), see live progress bars vs. your protein / calorie / carb / fat targets.
 - **🏋️ Gym** — log exercises (sets × reps @ weight). Shows your last session and
   all-time PR for each exercise so you know what to beat (progressive overload).
+- **📈 Weight** — log daily weigh-ins, see a trend chart against your goal, and a
+  weekly-rate readout that tells you if you're gaining at the right pace.
 - **⚙️ Targets** — edit your targets, or auto-calculate them from your goal weight.
 
 Default targets are set for a 150 → 170 lb lean bulk: **160g protein, 2,700 cal/day.**
@@ -38,13 +40,14 @@ Default targets are set for a 150 → 170 lb lean bulk: **160g protein, 2,700 ca
 - `src/lib/db.js` — storage adapter: SQLite (Tauri) or localStorage (browser).
 - `src/lib/components/Macros.svelte` — macro tracking tab
 - `src/lib/components/Gym.svelte` — workout tracking tab
+- `src/lib/components/Weight.svelte` — bodyweight log + hand-rolled SVG trend chart
 - `src/lib/components/Settings.svelte` — targets tab
 - `src/routes/+page.svelte` — tab shell + global styling
 - `src-tauri/src/lib.rs` — Rust shell + SQLite schema migrations
 - `src-tauri/capabilities/default.json` — plugin permissions (incl. SQL execute)
 
-## Ideas for v2
+## Ideas for next
 
-- Bodyweight log + trend chart to verify you're gaining 0.25–0.5 lb/week (now
-  easy — query the SQLite history directly)
+- Weekly protein/calorie adherence stats (you've now got the history for it)
+- Export your data to CSV
 - Weekly protein/calorie adherence stats

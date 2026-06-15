@@ -3,6 +3,7 @@
 	import { state as store, initStore } from '$lib/state.svelte.js';
 	import Macros from '$lib/components/Macros.svelte';
 	import Gym from '$lib/components/Gym.svelte';
+	import Weight from '$lib/components/Weight.svelte';
 	import Settings from '$lib/components/Settings.svelte';
 
 	onMount(initStore);
@@ -10,6 +11,7 @@
 	const tabs = [
 		{ id: 'macros', label: '🍗 Macros' },
 		{ id: 'gym', label: '🏋️ Gym' },
+		{ id: 'weight', label: '📈 Weight' },
 		{ id: 'settings', label: '⚙️ Targets' }
 	];
 	let active = $state('macros');
@@ -34,6 +36,8 @@
 			<Macros />
 		{:else if active === 'gym'}
 			<Gym />
+		{:else if active === 'weight'}
+			<Weight />
 		{:else}
 			<Settings />
 		{/if}

@@ -10,7 +10,9 @@ import {
 	addFoodEntry,
 	removeFoodEntry,
 	addWorkoutEntry,
-	removeWorkoutEntry
+	removeWorkoutEntry,
+	logBodyweight,
+	removeBodyweight
 } from '$lib/db.js';
 
 // Starter food database — grocery-store staples, macros per common serving.
@@ -51,7 +53,8 @@ export const state = $state({
 	targets: { ...DEFAULT_TARGETS },
 	foods: [],
 	foodLog: {}, // { 'YYYY-MM-DD': [ {id, name, qty, calories, protein, carbs, fat} ] }
-	workoutLog: {} // { 'YYYY-MM-DD': [ {id, exercise, sets, reps, weight} ] }
+	workoutLog: {}, // { 'YYYY-MM-DD': [ {id, exercise, sets, reps, weight} ] }
+	bodyweightLog: [] // [ {date, weight} ] sorted ascending by date
 });
 
 // Persist target edits (they come from bind:value in the Settings tab, so there's
@@ -94,6 +97,7 @@ export async function initStore() {
 
 	state.foodLog = data.foodLog ?? {};
 	state.workoutLog = data.workoutLog ?? {};
+	state.bodyweightLog = data.bodyweightLog ?? [];
 	state.ready = true;
 }
 
@@ -211,6 +215,39 @@ export function prFor(exercise) {
 		}
 	}
 	return max;
+}
+
+// Record today's weigh-in (one per day — upserts). Also updates the current
+// bodyweight target so calorie math stays accurate.
+export async function logWeight(weight) {
+	const w = +weight;
+	if (!w) return;
+	const date = todayKey();
+	await logBodyweight(date, w);
+	const existing = state.bodyweightLog.find((e) => e.date === date);
+	if (existing) existing.weight = w;
+	else {
+		state.bodyweightLog.push({ date, weight: w });
+		state.bodyweightLog.sort((a, z) => a.date.localeCompare(z.date));
+	}
+	state.targets.bodyweight = w; // persisted via the targets effect
+}
+
+export async function removeWeight(date) {
+	await removeBodyweight(date);
+	state.bodyweightLog = state.bodyweightLog.filter((e) => e.date !== date);
+}
+
+// Average lb/week gained across the logged range. Null if fewer than 2 points
+// or all on the same day.
+export function weeklyRate() {
+	const log = state.bodyweightLog;
+	if (log.length < 2) return null;
+	const first = log[0];
+	const last = log[log.length - 1];
+	const days = (new Date(last.date) - new Date(first.date)) / 86400000;
+	if (days <= 0) return null;
+	return round(((last.weight - first.weight) / days) * 7);
 }
 
 // Distinct exercise names you've logged before (for autocomplete).
