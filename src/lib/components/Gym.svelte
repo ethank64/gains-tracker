@@ -11,9 +11,9 @@
 	let pr = $derived(prFor(exercise));
 	let exercises = $derived(knownExercises());
 
-	function add() {
+	async function add() {
 		if (!exercise.trim() || !weight) return;
-		logWorkout(exercise, sets, reps, weight);
+		await logWorkout(exercise, sets, reps, weight);
 		// keep the exercise selected so you can log the next one fast
 		weight = '';
 	}

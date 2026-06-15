@@ -1,7 +1,11 @@
 <script>
+	import { onMount } from 'svelte';
+	import { state as store, initStore } from '$lib/state.svelte.js';
 	import Macros from '$lib/components/Macros.svelte';
 	import Gym from '$lib/components/Gym.svelte';
 	import Settings from '$lib/components/Settings.svelte';
+
+	onMount(initStore);
 
 	const tabs = [
 		{ id: 'macros', label: '🍗 Macros' },
@@ -24,7 +28,9 @@
 	</nav>
 
 	<section>
-		{#if active === 'macros'}
+		{#if !store.ready}
+			<p class="loading">Loading your data…</p>
+		{:else if active === 'macros'}
 			<Macros />
 		{:else if active === 'gym'}
 			<Gym />
@@ -96,6 +102,11 @@
 	nav button.active {
 		background: var(--accent);
 		color: #0d0f12;
+	}
+	.loading {
+		text-align: center;
+		color: var(--muted);
+		padding: 2rem 0;
 	}
 
 	/* Shared element styling, available to all tab components via :global */

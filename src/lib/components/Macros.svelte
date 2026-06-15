@@ -16,13 +16,13 @@
 		{ key: 'fat', label: 'Fat', unit: 'g', value: totals.fat, target: db.targets.fat }
 	]);
 
-	function add() {
-		logFood(db.foods[selectedIdx], +qty || 1);
+	async function add() {
+		await logFood(db.foods[selectedIdx], +qty || 1);
 	}
 
-	function saveCustom() {
+	async function saveCustom() {
 		if (!custom.name.trim()) return;
-		addCustomFood(custom);
+		await addCustomFood(custom);
 		custom = { name: '', calories: '', protein: '', carbs: '', fat: '' };
 		showAdd = false;
 		selectedIdx = db.foods.length - 1;

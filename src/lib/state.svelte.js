@@ -1,12 +1,19 @@
 // Central reactive state for Gains Tracker.
-// Uses Svelte 5 runes ($state) and persists everything to localStorage so your
-// data survives app restarts. Single-device, fully local — no server involved.
-import { browser } from '$app/environment';
+// `state` is the in-memory, reactive source of truth the UI renders from.
+// Persistence is delegated to the storage adapter in db.js — SQLite inside the
+// Tauri app, localStorage in the browser. Every mutation updates `state` AND
+// writes through to the backend; on startup initStore() hydrates from it.
+import {
+	loadAll,
+	saveTargets,
+	addFoodDef,
+	addFoodEntry,
+	removeFoodEntry,
+	addWorkoutEntry,
+	removeWorkoutEntry
+} from '$lib/db.js';
 
-const STORAGE_KEY = 'gains-tracker-v1';
-
-// Starter food database — your grocery-store staples, with macros per common
-// serving. Edit/add to this freely in the app; changes are saved.
+// Starter food database — grocery-store staples, macros per common serving.
 const DEFAULT_FOODS = [
 	{ name: 'Whey protein (1 scoop)', calories: 120, protein: 25, carbs: 3, fat: 1.5 },
 	{ name: 'Protein shake (Core Power)', calories: 170, protein: 26, carbs: 9, fat: 4.5 },
@@ -39,32 +46,55 @@ const DEFAULT_TARGETS = {
 	fat: 65
 };
 
-function load() {
-	if (!browser) return null;
-	try {
-		return JSON.parse(localStorage.getItem(STORAGE_KEY));
-	} catch {
-		return null;
-	}
-}
-
-const saved = load();
-
 export const state = $state({
-	targets: { ...DEFAULT_TARGETS, ...(saved?.targets ?? {}) },
-	foods: saved?.foods ?? DEFAULT_FOODS,
-	foodLog: saved?.foodLog ?? {}, // { 'YYYY-MM-DD': [ {name, qty, calories, protein, carbs, fat} ] }
-	workoutLog: saved?.workoutLog ?? {} // { 'YYYY-MM-DD': [ {exercise, sets, reps, weight} ] }
+	ready: false, // flips true once data is loaded from the backend
+	targets: { ...DEFAULT_TARGETS },
+	foods: [],
+	foodLog: {}, // { 'YYYY-MM-DD': [ {id, name, qty, calories, protein, carbs, fat} ] }
+	workoutLog: {} // { 'YYYY-MM-DD': [ {id, exercise, sets, reps, weight} ] }
 });
 
-// Auto-save on any change. JSON.stringify reads every nested field, so the
-// effect re-runs whenever anything in the tree mutates.
-if (browser) {
-	$effect.root(() => {
-		$effect(() => {
-			localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-		});
+// Persist target edits (they come from bind:value in the Settings tab, so there's
+// no helper to hook). Re-runs whenever a target field changes; the `ready` guard
+// stops it from firing during the initial hydrate.
+$effect.root(() => {
+	$effect(() => {
+		const t = state.targets;
+		const snapshot = {
+			bodyweight: t.bodyweight,
+			goalWeight: t.goalWeight,
+			calories: t.calories,
+			protein: t.protein,
+			carbs: t.carbs,
+			fat: t.fat
+		};
+		if (state.ready) saveTargets(snapshot);
 	});
+});
+
+// Load everything from the backend, seeding defaults on first run.
+export async function initStore() {
+	if (state.ready) return;
+	const data = await loadAll();
+
+	if (data.targets) {
+		state.targets = data.targets;
+	} else {
+		await saveTargets(DEFAULT_TARGETS);
+		state.targets = { ...DEFAULT_TARGETS };
+	}
+
+	if (data.foods?.length) {
+		state.foods = data.foods;
+	} else {
+		const seeded = [];
+		for (const f of DEFAULT_FOODS) seeded.push({ id: await addFoodDef(f), ...f });
+		state.foods = seeded;
+	}
+
+	state.foodLog = data.foodLog ?? {};
+	state.workoutLog = data.workoutLog ?? {};
+	state.ready = true;
 }
 
 // ---- helpers ----
@@ -76,22 +106,28 @@ export function todayKey() {
 	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function logFood(food, qty = 1) {
+export async function logFood(food, qty = 1) {
 	const k = todayKey();
-	if (!state.foodLog[k]) state.foodLog[k] = [];
-	state.foodLog[k].push({
+	const entry = {
+		date: k,
 		name: food.name,
 		qty,
 		calories: round(food.calories * qty),
 		protein: round(food.protein * qty),
 		carbs: round(food.carbs * qty),
 		fat: round(food.fat * qty)
-	});
+	};
+	const id = await addFoodEntry(entry);
+	if (!state.foodLog[k]) state.foodLog[k] = [];
+	state.foodLog[k].push({ id, ...entry });
 }
 
-export function removeFood(i) {
+export async function removeFood(i) {
 	const k = todayKey();
-	state.foodLog[k]?.splice(i, 1);
+	const entry = state.foodLog[k]?.[i];
+	if (!entry) return;
+	await removeFoodEntry(entry.id);
+	state.foodLog[k].splice(i, 1);
 }
 
 export function todaysFood() {
@@ -110,30 +146,38 @@ export function todaysTotals() {
 	);
 }
 
-export function addCustomFood(food) {
-	state.foods.push({
+export async function addCustomFood(food) {
+	const f = {
 		name: food.name,
 		calories: +food.calories || 0,
 		protein: +food.protein || 0,
 		carbs: +food.carbs || 0,
 		fat: +food.fat || 0
-	});
+	};
+	const id = await addFoodDef(f);
+	state.foods.push({ id, ...f });
 }
 
-export function logWorkout(exercise, sets, reps, weight) {
+export async function logWorkout(exercise, sets, reps, weight) {
 	const k = todayKey();
-	if (!state.workoutLog[k]) state.workoutLog[k] = [];
-	state.workoutLog[k].push({
+	const entry = {
+		date: k,
 		exercise: exercise.trim(),
 		sets: +sets,
 		reps: +reps,
 		weight: +weight
-	});
+	};
+	const id = await addWorkoutEntry(entry);
+	if (!state.workoutLog[k]) state.workoutLog[k] = [];
+	state.workoutLog[k].push({ id, ...entry });
 }
 
-export function removeWorkout(i) {
+export async function removeWorkout(i) {
 	const k = todayKey();
-	state.workoutLog[k]?.splice(i, 1);
+	const entry = state.workoutLog[k]?.[i];
+	if (!entry) return;
+	await removeWorkoutEntry(entry.id);
+	state.workoutLog[k].splice(i, 1);
 }
 
 export function todaysWorkouts() {
@@ -150,9 +194,7 @@ export function lastSession(exercise) {
 		.sort()
 		.reverse();
 	for (const k of keys) {
-		const hit = [...state.workoutLog[k]]
-			.reverse()
-			.find((w) => w.exercise.toLowerCase() === name);
+		const hit = [...state.workoutLog[k]].reverse().find((w) => w.exercise.toLowerCase() === name);
 		if (hit) return { date: k, ...hit };
 	}
 	return null;

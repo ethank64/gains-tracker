@@ -1,8 +1,10 @@
 # GAINS — macro + gym tracker
 
 A local desktop app for tracking daily macros and workouts while lean-bulking.
-Built with **Tauri 2 + SvelteKit (Svelte 5)**. All data is stored locally in the
-browser/webview (`localStorage`) — no server, no account, single device.
+Built with **Tauri 2 + SvelteKit (Svelte 5)**. Data is stored locally in a
+**SQLite** database (via `tauri-plugin-sql`) inside the native app — no server,
+no account, single device. Running in a plain browser (`pnpm dev`) falls back to
+`localStorage` so the fast dev loop still works.
 
 ## Run it
 
@@ -31,16 +33,18 @@ Default targets are set for a 150 → 170 lb lean bulk: **160g protein, 2,700 ca
 
 ## Code map
 
-- `src/lib/state.svelte.js` — all reactive state, the food database, persistence,
-  and helper logic (totals, last-session, PR). Start here.
+- `src/lib/state.svelte.js` — reactive state, the default food database, async
+  load + write-through, and helper logic (totals, last-session, PR). Start here.
+- `src/lib/db.js` — storage adapter: SQLite (Tauri) or localStorage (browser).
 - `src/lib/components/Macros.svelte` — macro tracking tab
 - `src/lib/components/Gym.svelte` — workout tracking tab
 - `src/lib/components/Settings.svelte` — targets tab
 - `src/routes/+page.svelte` — tab shell + global styling
-- `src-tauri/` — the Rust/Tauri native shell
+- `src-tauri/src/lib.rs` — Rust shell + SQLite schema migrations
+- `src-tauri/capabilities/default.json` — plugin permissions (incl. SQL execute)
 
 ## Ideas for v2
 
-- Move persistence into Rust + SQLite (`tauri-plugin-sql`) for real history/charts
-- Bodyweight log + trend chart to verify you're gaining 0.25–0.5 lb/week
+- Bodyweight log + trend chart to verify you're gaining 0.25–0.5 lb/week (now
+  easy — query the SQLite history directly)
 - Weekly protein/calorie adherence stats
